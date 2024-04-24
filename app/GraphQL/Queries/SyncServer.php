@@ -58,7 +58,7 @@ class SyncServer
             
             $softSchema[] = [
                 'name' => $softName,
-                'has_schema' => $softName != "openloop",
+                'has_schema' => $softName != "openloop" && (strpos($deviceType, "L3Dcube") != false),
                 'commands' => $this->getCommands($deviceType, $softName)
             ];
         }
