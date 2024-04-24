@@ -8,8 +8,8 @@ use Illuminate\Support\Facades\DB;
 class DeviceTypeSeeder extends Seeder
 {
     private array $device_types = [
-        'L3Dcube',
-        'L3Dcube FEI',
+        'L3Dcube_Looking_glass',
+        'L3Dcube_FEI',
     ];
 
     /**
