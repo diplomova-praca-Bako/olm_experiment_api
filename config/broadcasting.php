@@ -40,8 +40,10 @@ return [
                 'encrypted' => true,
                 'host' => env('APP_HOST', '147.175.105.186'),
                 'port' => 6001,
-                'scheme' => 'https',
-                'useTLS' => true,
+                // 'scheme' => 'https',
+                'scheme' => 'http',
+                // 'useTLS' => true,
+                'useTLS' => false,
                 'curl_options' => [
                     CURLOPT_SSL_VERIFYHOST => 0,
                     CURLOPT_SSL_VERIFYPEER => 0,
