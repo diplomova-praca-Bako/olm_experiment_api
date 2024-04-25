@@ -105,6 +105,7 @@ type SyncServerSoftware {
     name: String!
     has_schema: Boolean
     commands: [SyncServerCommand]!
+    has_demo: Boolean
 }
 
 type SyncServerDevice {

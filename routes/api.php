@@ -21,6 +21,7 @@ use App\Events\DataBroadcaster;
 //});
 
 Route::post('/schema/upload', [FileController::class, 'store']);
+Route::post('/demo/upload', [FileController::class, 'store']);
 Route::get("/experimentDetail/{id}", [FileController::class, 'download']);
 // Route::get('/broadcast', function () {
 //     for($i = 0; $i <= 10; $i++) {

@@ -41,7 +41,7 @@ def getArguments():
 
     input_str = args.input
     # keys = ['c_code', 'uploaded_code_file', 'uploaded_file', 'demo_name']
-    keys = ['c_code', 'uploaded_code_file', 'uploaded_file', 'file_name']
+    keys = ['c_code', 'uploaded_code_file', 'uploaded_file', 'demo_name']
     result = {}
 
     pattern = re.compile(r'(' + '|'.join(keys) + r'):(.*?)(?=(?:, ' + '|'.join(keys) + r':)|$)', re.DOTALL)
@@ -138,8 +138,8 @@ def main():
 
 
 
-  if(args["file_name"] and args["file_name"] != ""):
-    demo_file_path = os.path.join(args['uploaded_file'], args['demo_name'] + '.py')
+  if(args["demo_name"] and args["demo_name"] != ""):
+    demo_file_path = os.path.join(args['uploaded_file'], args['demo_name'] + '.c')
     demo_content: any
     try:
         with open(demo_file_path, 'r') as file:

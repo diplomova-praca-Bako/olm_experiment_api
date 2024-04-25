@@ -32,12 +32,15 @@ class StopScript
         }
 
         $schema_name = explode(".",$experiment->schema_name)[0];
+        $demo_name = explode(".",$experiment->demo_name)[0];
+
 
         $process = new Process([
             "./../server_scripts/$deviceName/stop.py",
             '--port', $device->port,
             '--software', $experiment->software_name,
-            '--fileName', $schema_name
+            '--fileName', $schema_name,
+            '--demoName', $demo_name
         ]);
 
         $process->start();

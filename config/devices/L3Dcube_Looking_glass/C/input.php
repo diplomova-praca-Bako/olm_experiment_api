@@ -7,7 +7,14 @@ return [
 			"rules" => "required",
 			"title" => "C code",
 			"placeholder" => "
-setPixelColor({1,1,1}, {255, 0, 0});
+setPixelColor({0,0,0}, {255, 0, 0});
+setPixelColor({0,0,1}, {255, 0, 0});
+setPixelColor({0,0,2}, {255, 0, 0});
+setPixelColor({0,0,3}, {255, 0, 0});
+setPixelColor({0,0,4}, {255, 0, 0});
+setPixelColor({0,0,5}, {255, 0, 0});
+setPixelColor({0,0,6}, {255, 0, 0});
+setPixelColor({0,0,7}, {255, 0, 0});
 sleep(500);",
 			"type" => "textarea",
 			"row" => 1,
