@@ -71,50 +71,55 @@ const int cube_size = 8;
 using namespace std;
 
 
-int xyzToIndex(int x, int y, int z) {{
-    return z * cube_size * cube_size + x * cube_size + y;
-}}
+namespace SafeAPI {{
 
-void setPixelColor(std::vector<int> position, std::vector<int> color) {{
-
-    int index = xyzToIndex(position[0], position[1], position[2]);
-    int r = color[0];
-    int g = color[1];
-    int b = color[2];
-
-    cout << "Pixel," << r << "," << g << "," << b << "," << index << endl;
-}}
-
-void setMultiplePixelColor(std::vector<std::vector<int>> positions, std::vector<int> color) {{
-    int r = color[0];
-    int g = color[1];
-    int b = color[2];
-
-    cout << "Pixels," << r << "," << g << "," << b;
-
-    std::vector<int> indexes;
-
-    for (size_t i = 0; i < positions.size(); ++i) {{
-        if (positions[i].size() == 3) {{ 
-            int index = xyzToIndex(positions[i][0], positions[i][1], positions[i][2]);
-            indexes.push_back(index);
-            cout << "," << index;
-        }}
+    int xyzToIndex(int x, int y, int z) {{
+        return z * cube_size * cube_size + x * cube_size + y;
     }}
 
-    cout << endl;
-}}
+    void setPixelColor(std::vector<int> position, std::vector<int> color) {{
 
-void clearCube() {{
-  cout << "clearCube" << endl;
-}}
+        int index = xyzToIndex(position[0], position[1], position[2]);
+        int r = color[0];
+        int g = color[1];
+        int b = color[2];
 
-void sleep(int millis) {{
-    cout << "sleep" << "," << millis << endl;
+        cout << "Pixel," << r << "," << g << "," << b << "," << index << endl;
+    }}
 
+    void setMultiplePixelColor(std::vector<std::vector<int>> positions, std::vector<int> color) {{
+        int r = color[0];
+        int g = color[1];
+        int b = color[2];
+
+        cout << "Pixels," << r << "," << g << "," << b;
+
+        std::vector<int> indexes;
+
+        for (size_t i = 0; i < positions.size(); ++i) {{
+            if (positions[i].size() == 3) {{ 
+                int index = xyzToIndex(positions[i][0], positions[i][1], positions[i][2]);
+                indexes.push_back(index);
+                cout << "," << index;
+            }}
+        }}
+
+        cout << endl;
+    }}
+
+    void clearCube() {{
+    cout << "clearCube" << endl;
+    }}
+
+    void sleep(int millis) {{
+        cout << "sleep" << "," << millis << endl;
+
+    }}
 }}
 
 int main() {{
+    using namespace SafeAPI;
+
     {cpp_code}
     return 0;
 }}
@@ -133,11 +138,6 @@ int main() {{
 
 def main():
   args = getArguments()
-  print("ARGS MAIN")
-  print(args)
-
-
-
   if(args["demo_name"] and args["demo_name"] != ""):
     demo_file_path = os.path.join(args['uploaded_file'], args['demo_name'] + '.c')
     demo_content: any
@@ -168,25 +168,36 @@ def run_instructions(code, port):
   if arduino:
       arduino.close()
 
+
+# Function to compile and run C++ code, with timeout handling
 def compile_and_run_cpp(cpp_file_path):
     executable_path = cpp_file_path.rsplit('.', 1)[0]
-    # Include -std=c++11 to specify using the C++11 standard
     compile_command = f"g++ -std=c++11 {cpp_file_path} -o {executable_path}"
+    output = ""
     try:
+        # Compiling the C++ code
         subprocess.check_call(compile_command, shell=True)
         print("Compilation successful.")
-        # Execute the compiled code and capture the output
-        output = subprocess.check_output(executable_path, text=True)
+
+        # Attempt to run the executable with a timeout
+        process = subprocess.Popen([executable_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            output, errors = process.communicate(timeout=1)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            output, errors = process.communicate()
+            print(f"Process timed out. Partial output: {output.strip()}")
         return output.strip()
+
     except subprocess.CalledProcessError as e:
         print(f"Error during compilation or execution: {e}")
     finally:
         # Cleanup
         os.remove(cpp_file_path)
-        # Ensure executable_path exists before attempting to remove it
         if os.path.exists(executable_path):
             os.remove(executable_path)
-    return ""
+    return output
+
 
 
 def send_serial_commands(port, commands):
@@ -194,23 +205,29 @@ def send_serial_commands(port, commands):
     try:
         if arduino is None:
             arduino = serial.Serial(port, 250000)
-            time.sleep(2)
+            time.sleep(2)  # Wait for the Arduino to establish connection
+
+        start_time = time.time()  # Start timing the execution
 
         for command in commands:
-            start_time=time.time()
+            if time.time() - start_time > 30:
+                print("30 seconds have elapsed. Stopping the transmission.")
+                break  # Exit the loop if 30 seconds have passed
 
-            print(f"Sending command to Arduino: {command}")
+            # print(f"Sending command to Arduino: {command}")
             arduino.write((command + '\n').encode())
             
             wait_for_acknowledgement()  # Wait for ACK instead of using sleep
-            end_time=time.time()
-            elapsed_time = end_time - start_time  # Calculate the elapsed time
-            print("Elapsed time:", elapsed_time, "seconds")
-            
-        arduino.write(b"clearCube\n")
-     
+
+        arduino.write(b"clearCube\n")  # Send command to clear the cube after sending all commands
+
     except serial.SerialException as e:
         print(f"Error in serial communication: {e}")
+
+    finally:
+        if arduino:
+            arduino.close()  # Ensure the serial port is closed after operations
+
 
 
 if __name__ == '__main__':
