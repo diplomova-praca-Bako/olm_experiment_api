@@ -7,8 +7,8 @@ import serial
 import time
 import tempfile
 import re
+from multiprocessing import Process, Manager
 
-arduino = None
 
 def time_it(func):
     def wrapper(*args, **kwargs):
@@ -19,8 +19,7 @@ def time_it(func):
         return result
     return wrapper
 
-def wait_for_acknowledgement():
-    global arduino
+def wait_for_acknowledgement(arduino):
     while True:
         if arduino.in_waiting > 0:
             line = arduino.readline().decode().strip()
@@ -40,7 +39,6 @@ def getArguments():
     print(args)
 
     input_str = args.input
-    # keys = ['c_code', 'uploaded_code_file', 'uploaded_file', 'demo_name']
     keys = ['c_code', 'uploaded_code_file', 'uploaded_file', 'demo_name']
     result = {}
 
@@ -124,11 +122,9 @@ int main() {{
     return 0;
 }}
 """
-    # Fill the template with the user-provided C++ code
-    # The double curly braces {{ and }} are escaped and treated as literal curly braces in the formatted string
+
     cpp_content = cpp_template.format(cpp_code=cpp_code)
 
-    # Create a temporary file to hold the C++ code
     temp_cpp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".cpp")
     with open(temp_cpp_file.name, 'w') as file:
         file.write(cpp_content)
@@ -160,13 +156,16 @@ def run_instructions(code, port):
   cpp_file_path = create_cpp_file_from_template(code)
   command_outputs = compile_and_run_cpp(cpp_file_path)
   if command_outputs:
-      # Split the output into individual commands based on newline
-      commands = command_outputs.split('\n')
-      # Send each command separately
-      send_serial_commands(port, commands)
 
-  if arduino:
-      arduino.close()
+    commands = command_outputs.split('\n')
+    send_serial_commands_process = Process(target=send_serial_commands, args=(port, commands))
+    send_serial_commands_process.start()
+
+    send_serial_commands_process.join(timeout=30)
+    if send_serial_commands_process.is_alive():
+        print("Timeout reached. Terminating process now...")
+        send_serial_commands_process.terminate()
+        send_serial_commands_process.join()
 
 
 # Function to compile and run C++ code, with timeout handling
@@ -182,7 +181,7 @@ def compile_and_run_cpp(cpp_file_path):
         # Attempt to run the executable with a timeout
         process = subprocess.Popen([executable_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
-            output, errors = process.communicate(timeout=1)
+            output, errors = process.communicate(timeout=0.5)
         except subprocess.TimeoutExpired:
             process.kill()
             output, errors = process.communicate()
@@ -201,32 +200,19 @@ def compile_and_run_cpp(cpp_file_path):
 
 
 def send_serial_commands(port, commands):
-    global arduino
-    try:
-        if arduino is None:
-            arduino = serial.Serial(port, 250000)
-            time.sleep(2)  # Wait for the Arduino to establish connection
+    arduino = serial.Serial(port, 250000)
+    wait_for_acknowledgement(arduino)  #this instead of time.sleep(2)
 
-        start_time = time.time()  # Start timing the execution
 
-        for command in commands:
-            if time.time() - start_time > 30:
-                print("30 seconds have elapsed. Stopping the transmission.")
-                break  # Exit the loop if 30 seconds have passed
+    for command in commands:
+        arduino.write((command + '\n').encode())
+        
+        wait_for_acknowledgement(arduino)
 
-            # print(f"Sending command to Arduino: {command}")
-            arduino.write((command + '\n').encode())
-            
-            wait_for_acknowledgement()  # Wait for ACK instead of using sleep
+    arduino.write(b"clearCube\n")
 
-        arduino.write(b"clearCube\n")  # Send command to clear the cube after sending all commands
-
-    except serial.SerialException as e:
-        print(f"Error in serial communication: {e}")
-
-    finally:
-        if arduino:
-            arduino.close()  # Ensure the serial port is closed after operations
+    if arduino:
+        arduino.close()
 
 
 

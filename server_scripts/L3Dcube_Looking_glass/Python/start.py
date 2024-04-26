@@ -6,60 +6,12 @@ import serial
 import time
 import math
 import random
-from multiprocessing import Process
+from multiprocessing import Process, Manager
 import re
+import sys
+import tempfile
 
-arduino = None
-cube_size=8
-
-
-def time_it(func):
-    def wrapper(*args, **kwargs):
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        print(f"{func.__name__} executed in {end_time - start_time} seconds")
-        return result
-    return wrapper
-
-@time_it
-def wait_for_acknowledgement():
-    global arduino
-    while True:
-        if arduino.in_waiting > 0:
-            line = arduino.readline().decode().strip()
-            if line == "ACK":
-                break
-
-@time_it
-def getArguments():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--port")
-    parser.add_argument("--input")
-    parser.add_argument("--output")
-    args = parser.parse_args()
-
-    print("ARGS getArguments")
-    print(args)
-
-    input_str = args.input
-    # keys = ['c_code', 'uploaded_code_file', 'uploaded_file', 'demo_name']
-    keys = ['python_code', 'uploaded_code_file', 'uploaded_file', 'demo_name']
-    result = {}
-
-    pattern = re.compile(r'(' + '|'.join(keys) + r'):(.*?)(?=(?:, ' + '|'.join(keys) + r':)|$)', re.DOTALL)
-
-    matches = pattern.finditer(input_str)
-    for match in matches:
-        key = match.group(1)
-        value = match.group(2).strip().rstrip(',')
-        result[key] = value
-
-    # Add the port and output which are parsed directly from the arguments
-    result['port'] = args.port
-    result['output'] = args.output
-
-    return result
+cube_size = 8
 
 def main():
     args=getArguments()
@@ -78,99 +30,169 @@ def main():
 
     elif(args["uploaded_code_file"] and args["uploaded_code_file"] != ""):
         run_process(args["uploaded_code_file"], args["port"])
-    else:
+    elif(args["python_code"] and args["python_code"] != ""):
         run_process(args["python_code"], args["port"])
+    else:
+        return
 
+def getArguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port")
+    parser.add_argument("--input")
+    parser.add_argument("--output")
+    args = parser.parse_args()
+
+    input_str = args.input
+    keys = ['python_code', 'uploaded_code_file', 'uploaded_file', 'demo_name']
+    result = {}
+    pattern = re.compile(r'(' + '|'.join(keys) + r'):(.*?)(?=(?:, ' + '|'.join(keys) + r':)|$)', re.DOTALL)
+    matches = pattern.finditer(input_str)
+    for match in matches:
+        key = match.group(1)
+        value = match.group(2).strip().rstrip(',')
+        result[key] = value
+
+    result['port'] = args.port
+    result['output'] = args.output
+    return result
+
+
+def process_wrapper(shared_dict, code, temp_file_path):
+    output = generate_arduino_instructions(code, temp_file_path)
+    shared_dict['output'] = output
+    
 
 def run_process(code, port):
-    code_process = Process(target=run_instructions, args=(code,port))
-    code_process.start()
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        temp_file_path = temp_file.name
 
-    code_process.join(timeout=12.5)
-    if code_process.is_alive():
-        print("Timeout reached. Terminating process now...")
-        code_process.terminate()
-        code_process.join()
+    with Manager() as manager:
+        shared_dict = manager.dict()
 
-        arduinoClear = serial.Serial(port, 250000)
-        arduinoClear.write(b"clearCube\n")
-        arduinoClear.close()
-    print("Process has been terminated.")
-#    arduino.close()
+        code_process = Process(target=process_wrapper, args=(shared_dict, code, temp_file_path))
+        code_process.start()
+        code_process.join(timeout=0.1)
 
-def run_instructions(code, port):
-    global arduino
-    arduino = serial.Serial(port, 250000)
-    time.sleep(2) #inicializacia arduina
+        if code_process.is_alive():
+            print("Timeout reached. Terminating process now...")
+            code_process.terminate()
+            code_process.join()
 
+    try:
+        with open(temp_file_path, 'r') as file:
+            output = file.read()
+            commands = output.split('\n')
+    
+            send_serial_commands_process = Process(target=send_serial_commands, args=(port, commands))
+            send_serial_commands_process.start()
+
+            send_serial_commands_process.join(timeout=30)
+            if send_serial_commands_process.is_alive():
+                print("Timeout reached. Terminating process now...")
+                send_serial_commands_process.terminate()
+                send_serial_commands_process.join()
+
+                # arduinoClear = serial.Serial(port, 250000)
+                # arduinoClear.write(b"clearCube\n")
+                # arduinoClear.close()
+
+            print("Process has been terminated.")
+
+    except IOError:
+        print("Failed to read output from the temporary file.")
+
+        os.remove(temp_file_path)
+        print("Process has been terminated.")
+
+
+def generate_arduino_instructions(code, temp_file_path):
     local_scope = {
         'setPixelColor': setPixelColor,
         'setMultiplePixelColor': setMultiplePixelColor,
         'clearCube': clearCube,
         'cube_size': cube_size,
-        'arduino': arduino,
-        # 'time': time,
         'sleep': sleep,
         'math': math,
         'random': random
     }
 
-    try:
-        print(repr(code))
-        exec(code, local_scope)
-    except Exception as e:
-        print(f"Error executing threaded dynamic code: {e}")
-    finally:
-        clearCube()
+    with open(temp_file_path, "w") as temp_file:
+        old_stdout = sys.stdout
+        sys.stdout = temp_file
+
+        try:
+            exec(code, local_scope)
+        except Exception as e:
+            print(f"Error executing dynamic code: {e}")
+
+        sys.stdout = old_stdout
+    
+
+def send_serial_commands(port, commands):
+
+    # arduino_init_start = time.time()
+
+    arduino = serial.Serial(port, 250000)
+    wait_for_acknowledgement(arduino)  #this instead of time.sleep(2)
+
+    # arduino_end_time = time.time()
+    # arduino_duration = arduino_end_time - arduino_init_start
+    # print(f"Arduino connection established in {arduino_duration} seconds")
+
+    #time.sleep(2)
+
+
+    for command in commands:
+        # command_start_time = time.time()
+
+        # print(f"Sending command to Arduino: {command}")
+        
+        arduino.write((command + '\n').encode())
+        
+        wait_for_acknowledgement(arduino)
+        # command_end_time = time.time()
+        # command_duration = command_end_time - command_start_time
+        # print(f"Command executed in {command_duration} seconds")
+
+    arduino.write(b"clearCube\n")
+
+    if arduino:
         arduino.close()
 
 
-@time_it
+def wait_for_acknowledgement(arduino):
+    while True:
+        if arduino.in_waiting > 0:
+            line = arduino.readline().decode().strip()
+            if line == "ACK":
+                # print("ACK received")
+                break
+
+
 def setPixelColor(position, color):
     index = xyz_to_index(position[0], position[1], position[2])
-    if len(color) != 3:
-        raise ValueError("Color must be a list of three integers")
+    command = f"Pixel,{color[0]},{color[1]},{color[2]},{index}"
+    print(command)
 
-    command = f"Pixel,{color[0]},{color[1]},{color[2]},{index}\n"
-    arduino.write(command.encode())
-    wait_for_acknowledgement()  # Wait for ACK instead of using sleep
 
-@time_it
 def setMultiplePixelColor(positions, color):
-    if len(color) != 3:
-        raise ValueError("Color must be a list of three integers")
-
-    # Convert positions to a list of indexes
     indexes = [xyz_to_index(pos[0], pos[1], pos[2]) for pos in positions]
-    
     command = f"Pixels,{color[0]},{color[1]},{color[2]},"
-    for index in indexes:
-        command += f"{index},"
-    command += f"\n"
+    command += ",".join(map(str, indexes))
+    print(command)
 
-    arduino.write(command.encode())
-    wait_for_acknowledgement()
 
-@time_it
 def clearCube():
-    global arduino
-    arduino.write(b"clearCube\n")
-    wait_for_acknowledgement()
+    print("clearCube\n")
 
-@time_it
+
 def sleep(millis):
-    global arduino
-    command = f"sleep,{millis}\n"
-    arduino.write(command.encode())
-    wait_for_acknowledgement()
+    print(f"sleep,{millis}")
 
-
-# def sleep(millis):
-#     time.sleep(millis/1000)
 
 def xyz_to_index(x, y, z):
-    # return y + z * cube_size + x * cube_size * cube_size
     return z * cube_size * cube_size + x * cube_size + y
+
 
 if __name__ == '__main__':
     main()
