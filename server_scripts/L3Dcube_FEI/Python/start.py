@@ -6,7 +6,6 @@ import subprocess
 import time
 import math
 import random
-from multiprocessing import Process
 import re
 from io import StringIO
 import sys
@@ -68,22 +67,17 @@ def main():
     else:
         run_process(args["python_code"], args["port"])
 
+    time.sleep(30)
+    clear_cube(args["port"])
 
-# def run_process(code, port):
-#     code_process = Process(target=run_instructions, args=(code,port))
-#     code_process.start()
+def clear_cube(port):
+  empty_sketch =  '''
+void setup(){}
 
-#     code_process.join(timeout=12.5)
-#     if code_process.is_alive():
-#         print("Timeout reached. Terminating process now...")
-#         code_process.terminate()
-#         code_process.join()
+void loop(){}
+'''
+  compile_and_upload(empty_sketch, port)
 
-#         arduinoClear = serial.Serial(port, 250000)
-#         arduinoClear.write(b"clearCube\n")
-#         arduinoClear.close()
-#     print("Process has been terminated.")
-# #    arduino.close()
 
 def run_process(code, port):
     dynamic_code=create_text_from_dynamic_code(code)

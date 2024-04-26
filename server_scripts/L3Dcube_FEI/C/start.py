@@ -4,6 +4,7 @@ import argparse
 import subprocess
 import os
 import re
+import time
 
 def compile_and_upload(code, port, board_type="arduino:avr:uno"):
     # Create a temporary directory to hold the sketch
@@ -65,7 +66,7 @@ def main():
     print(args)
 
     if args.get("demo_name"):
-        demo_file_path = os.path.join(args['uploaded_file'], args['demo_name'] + '.c')
+        demo_file_path = os.path.join(args['uploaded_file'], args['demo_name'] + '.cpp')
         try:
             with open(demo_file_path, 'r') as file:
                 demo_content = file.read()
@@ -80,10 +81,21 @@ def main():
         full_arduino_code = generate_arduino_code(args["uploaded_code_file"])
         compile_and_upload(full_arduino_code, args["port"])
 
+
     else:
         full_arduino_code = generate_arduino_code(args.get("c_code", ""))
         compile_and_upload(full_arduino_code, args["port"])
 
+    time.sleep(30)
+    clear_cube(args["port"])
+
+def clear_cube(port):
+  empty_sketch =  '''
+void setup(){}
+
+void loop(){}
+'''
+  compile_and_upload(empty_sketch, port)
 
 
 def generate_arduino_code(c_code_snippet):
