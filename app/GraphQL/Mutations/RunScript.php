@@ -8,6 +8,7 @@ use App\Models\ExperimentLog;
 use App\Jobs\StartReadingProcess;
 use App\Helpers\Helpers;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\Process\Process;
 
 
 class RunScript
@@ -60,13 +61,65 @@ class RunScript
             'started_at' => date("Y-m-d H:i:s")
         ]);
 
-        $readingProcess = new StartReadingProcess($date, $fileName, $path, $device, $args, $experiment, $deviceName);
-        dispatch($readingProcess)->onQueue("Reading");
+        
+        $status='success';
+        $errorMessage='';
+
+        if (strpos($deviceName, "L3Dcube") !== false) {  // if we are processing L3Dcube experiment, dont start reading
+            $process = new Process([
+                "$path",
+                '--port', $device->port,
+                '--output', $fileName,
+                '--input', $args['runScriptInput']['inputParameter']
+            ]);
+
+            $process->start();
+            sleep(2);
+            if ($process->getPid() != null) {
+                $experiment->update([
+                    'process_pid' => $process->getPid()
+                ]);
+            }
+            while($process->isRunning()) {
+                clearstatcache();
+            };
+            // clearstatcache();
+
+            $errorOutput = $process->getErrorOutput();
+            Log::debug('ErrorOutputLog', [$errorOutput]);
+            
+            if ($errorOutput !== "") {
+                $status = 'error';
+                // cleaning errors
+                if ($software === "C") { // C language errors
+                    Log::debug("SoftwareCerror", []);
+            
+                    // Specifically extract the error message without file paths and line/column numbers
+                    //this is for compilation errors
+                    preg_match("/error: '.*?' was not declared in this scope/", $errorOutput, $matches);
+                                                    //if no compilation error, clean serial comm errors
+                    $errorMessage = $matches[0] ?? ltrim(preg_replace('/\s*\/[^:]+:\d+:\d+:\s*/', '; ', $errorOutput), "; ");
+                } else { // Python language errors
+                    Log::debug("SoftwarePythonerror", []);
+                    preg_match('/\n(.+Error:.+)$/', $errorOutput, $matches);
+                    $errorMessage = $matches[1] ?? 'Error not found';
+                }
+            }
+            
+            Log::debug('error message log', [$errorMessage]);
+
+            Log::channel('server')->error("ERRORMESSAGE: " . $process->getErrorOutput());
+            Log::channel('server')->info("PROCESS OUTPUT: " . $process->getOutput());
+            
+        } else {
+            $readingProcess = new StartReadingProcess($date, $fileName, $path, $device, $args, $experiment, $deviceName);
+            dispatch($readingProcess)->onQueue("Reading");
+        }
 
         return [
-            'status' => 'success',
+            'status' => $status,
             'experimentID' => $experiment->id,
-            'errorMessage' => ''
+            'errorMessage' => $errorMessage
         ];
     }
 }

@@ -124,6 +124,7 @@ def generate_arduino_instructions(code, temp_file_path):
             exec(code, local_scope)
         except Exception as e:
             print(f"Error executing dynamic code: {e}")
+            raise(e)
 
         sys.stdout = old_stdout
     
