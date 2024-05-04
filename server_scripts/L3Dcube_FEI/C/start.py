@@ -86,8 +86,8 @@ def main():
         full_arduino_code = generate_arduino_code(args.get("c_code", ""))
         compile_and_upload(full_arduino_code, args["port"])
 
-    time.sleep(30)
-    clear_cube(args["port"])
+    # time.sleep(30)
+    # clear_cube(args["port"])
 
 def clear_cube(port):
   empty_sketch =  '''

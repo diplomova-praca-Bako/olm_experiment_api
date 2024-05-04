@@ -3,12 +3,13 @@
 namespace App\GraphQL\Mutations;
 
 use App\Events\DataBroadcaster;
+use App\Jobs\StartL3DProcess;
 use App\Models\Device;
 use App\Models\ExperimentLog;
 use App\Jobs\StartReadingProcess;
 use App\Helpers\Helpers;
 use Illuminate\Support\Facades\Log;
-use Symfony\Component\Process\Process;
+use Illuminate\Support\Facades\Cache;
 
 
 class RunScript
@@ -62,64 +63,34 @@ class RunScript
         ]);
 
         
-        $status='success';
-        $errorMessage='';
+        $uniqueId = uniqid();
+        $errorResult = null;
 
-        if (strpos($deviceName, "L3Dcube") !== false) {  // if we are processing L3Dcube experiment, dont start reading
-            $process = new Process([
-                "$path",
-                '--port', $device->port,
-                '--output', $fileName,
-                '--input', $args['runScriptInput']['inputParameter']
-            ]);
+        if (strpos($deviceName, "L3Dcube") !== false) {
+            $L3DProcess = new StartL3DProcess($date, $fileName, $path, $device, $args, $experiment, $deviceName, $software, $uniqueId);
+            dispatch($L3DProcess)->onQueue("Reading");
+            
+            sleep(4); //wait for experiment to finish compiling code or generating instructions to see possible errors
 
-            $process->start();
-            sleep(2);
-            if ($process->getPid() != null) {
-                $experiment->update([
-                    'process_pid' => $process->getPid()
-                ]);
-            }
-            while($process->isRunning()) {
-                clearstatcache();
-            };
-            // clearstatcache();
-
-            $errorOutput = $process->getErrorOutput();
-            Log::debug('ErrorOutputLog', [$errorOutput]);
-            
-            if ($errorOutput !== "") {
-                $status = 'error';
-                // cleaning errors
-                if ($software === "C") { // C language errors
-                    Log::debug("SoftwareCerror", []);
-            
-                    // Specifically extract the error message without file paths and line/column numbers
-                    //this is for compilation errors
-                    preg_match("/error: '.*?' was not declared in this scope/", $errorOutput, $matches);
-                                                    //if no compilation error, clean serial comm errors
-                    $errorMessage = $matches[0] ?? ltrim(preg_replace('/\s*\/[^:]+:\d+:\d+:\s*/', '; ', $errorOutput), "; ");
-                } else { // Python language errors
-                    Log::debug("SoftwarePythonerror", []);
-                    preg_match('/\n(.+Error:.+)$/', $errorOutput, $matches);
-                    $errorMessage = $matches[1] ?? 'Error not found';
-                }
-            }
-            
-            Log::debug('error message log', [$errorMessage]);
-
-            Log::channel('server')->error("ERRORMESSAGE: " . $process->getErrorOutput());
-            Log::channel('server')->info("PROCESS OUTPUT: " . $process->getOutput());
-            
+            $errorResult = Cache::get('job-result-' . $uniqueId);
+            Log::debug('ErrorResult', [$errorResult]);
         } else {
             $readingProcess = new StartReadingProcess($date, $fileName, $path, $device, $args, $experiment, $deviceName);
             dispatch($readingProcess)->onQueue("Reading");
         }
 
-        return [
-            'status' => $status,
-            'experimentID' => $experiment->id,
-            'errorMessage' => $errorMessage
-        ];
+        if ($errorResult && $errorResult['status'] === 'error') {
+            return[
+                'status' => 'error',
+                'experimentID' => $errorResult['experimentID'],
+                'errorMessage' => $errorResult['errorMessage']
+            ];
+        } else{
+            return [
+                'status' => 'success',
+                'experimentID' => $experiment->id,
+                'errorMessage' => ''
+            ];
+        }
     }
 }

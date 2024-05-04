@@ -67,8 +67,8 @@ def main():
     else:
         run_process(args["python_code"], args["port"])
 
-    time.sleep(30)
-    clear_cube(args["port"])
+    # time.sleep(30)
+    # clear_cube(args["port"])
 
 def clear_cube(port):
   empty_sketch =  '''
@@ -99,7 +99,7 @@ def delay(millis):
     print(f"delay({millis});")
 
 
-def create_text_from_dynamic_code(dynamic_code):
+def create_text_from_dynamic_code(dynamic_code): # obmedzit cas behu na par sekund
     local_scope = {
         'setvoxel': setvoxel,
         'clrvoxel': clrvoxel,
@@ -113,7 +113,13 @@ def create_text_from_dynamic_code(dynamic_code):
     sys.stdout = StringIO()
 
     # Execute the dynamic code
-    exec(dynamic_code, local_scope)
+    try:
+        exec(dynamic_code, local_scope)
+    except Exception as e:
+      print(f"Error executing dynamic code: {e}")
+      raise(e)
+
+
 
     # Retrieve the output from the StringIO object
     dynamic_text = sys.stdout.getvalue()

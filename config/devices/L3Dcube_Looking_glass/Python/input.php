@@ -5,7 +5,7 @@ return [
 		[
 			"name" => "python_code",
 			"rules" => "required",
-			"title" => "C code",
+			"title" => "Python code",
 			"placeholder" => "
 setPixelColor([0,0,7], [255, 0, 0])
 setPixelColor([0,0,6], [255, 0, 0])
