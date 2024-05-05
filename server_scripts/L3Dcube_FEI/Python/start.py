@@ -89,21 +89,25 @@ def run_process(code, port):
 
 
 
-def setvoxel(x, y, z):
-    print(f"setvoxel({x}, {y}, {z});")
+def setLed(x, y, z):
+    print(f"setLed({x}, {y}, {z});")
 
-def clrvoxel(x, y, z):
-    print(f"clrvoxel({x}, {y}, {z});")
+def clearLed(x, y, z):
+    print(f"clearLed({x}, {y}, {z});")
 
-def delay(millis):
-    print(f"delay({millis});")
+def sleep(millis):
+    print(f"sleep({millis});")
+
+def clearCube():
+    print(f"clearCube();")
 
 
 def create_text_from_dynamic_code(dynamic_code): # obmedzit cas behu na par sekund
     local_scope = {
-        'setvoxel': setvoxel,
-        'clrvoxel': clrvoxel,
-        'delay': delay,
+        'setLed': setLed,
+        'clearLed': clearLed,
+        'clearCube': clearCube,
+        'sleep': sleep,
         'math': math,
         'random': random
     }
@@ -165,6 +169,7 @@ def generate_arduino_code(c_code_snippet):
     arduino_code_template = '''
 #include <avr/interrupt.h>
 #include <string.h>
+#include <Arduino.h>
 #define AXIS_X 1
 #define AXIS_Y 2
 #define AXIS_Z 3
@@ -244,7 +249,7 @@ void loop()
 
 
 // Set a single voxel to ON
-void setvoxel(int x, int y, int z)
+void setLed(int x, int y, int z)
 {{
   if (inrange(x,y,z))
     cube[z][y] |= (1 << x);
@@ -252,7 +257,7 @@ void setvoxel(int x, int y, int z)
 
 
 // Set a single voxel to OFF
-void clrvoxel(int x, int y, int z)
+void clearLed(int x, int y, int z)
 {{
   if (inrange(x,y,z))
     cube[z][y] &= ~(1 << x);
@@ -274,7 +279,7 @@ unsigned char inrange(int x, int y, int z)
 }}
 
 // Get the current status of a voxel
-unsigned char getvoxel(int x, int y, int z)
+unsigned char getLed(int x, int y, int z)
 {{
   if (inrange(x,y,z))
   {{
@@ -291,21 +296,18 @@ unsigned char getvoxel(int x, int y, int z)
   }}
 }}
 
-
-// Fill a value into all 64 byts of the cube buffer
-// Mostly used for clearing. fill(0x00)
-// or setting all on. fill(0xff)
-void fill (unsigned char pattern)
-{{
-  int z;
-  int y;
-  for (z=0;z<8;z++)
-  {{
-    for (y=0;y<8;y++)
-    {{
-      cube[z][y] = pattern;
+void clearCube(){{
+    int z;
+    int y;
+    for (z = 0; z < 8; z++) {{
+        for (y = 0; y < 8; y++) {{
+            cube[z][y] = 0x00;
+        }}
     }}
-  }}
+}}
+
+void sleep(int millis){{
+  delay(millis);
 }}
 '''
     return arduino_code_template.format(c_code_snippet)

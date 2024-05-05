@@ -7,7 +7,7 @@ import serial
 import time
 import tempfile
 import re
-from multiprocessing import Process, Manager
+from multiprocessing import Process
 
 
 def time_it(func):
@@ -75,7 +75,7 @@ namespace SafeAPI {{
         return z * cube_size * cube_size + x * cube_size + y;
     }}
 
-    void setPixelColor(std::vector<int> position, std::vector<int> color) {{
+    void setLed(std::vector<int> position, std::vector<int> color) {{
 
         int index = xyzToIndex(position[0], position[1], position[2]);
         int r = color[0];
@@ -85,7 +85,7 @@ namespace SafeAPI {{
         cout << "Pixel," << r << "," << g << "," << b << "," << index << endl;
     }}
 
-    void setMultiplePixelColor(std::vector<std::vector<int>> positions, std::vector<int> color) {{
+    void setLeds(std::vector<std::vector<int>> positions, std::vector<int> color) {{
         int r = color[0];
         int g = color[1];
         int b = color[2];
@@ -166,7 +166,9 @@ def run_instructions(code, port):
         print("Timeout reached. Terminating process now...")
         send_serial_commands_process.terminate()
         send_serial_commands_process.join()
-
+        arduinoClear = serial.Serial(port, 250000)
+        arduinoClear.write(b"clearCube\n")
+        arduinoClear.close()
 
 # Function to compile and run C++ code, with timeout handling
 def compile_and_run_cpp(cpp_file_path):

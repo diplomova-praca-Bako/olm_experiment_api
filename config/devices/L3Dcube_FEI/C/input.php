@@ -10,8 +10,8 @@ return [
 for (int x = 0; x < cube_size; x++) {
 	for (int y = 0; y < cube_size; y++) {
 		for (int z = 0; z < cube_size; z++) {
-			setvoxel(x,y,z);
-			delay(30);
+			setLed(x,y,z);
+			sleep(30);
 		}
 	}
 }",

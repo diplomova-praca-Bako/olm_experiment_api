@@ -7,10 +7,10 @@ return [
 			"rules" => "required",
 			"title" => "Python code",
 			"placeholder" => "
-setvoxel(1, 2, 3)
-delay(1000)
-clrvoxel(1, 2, 3)
-delay(1000)
+setLed(1, 2, 3)
+sleep(1000)
+clearLed(1, 2, 3)
+sleep(1000)
 ",
 			"type" => "textarea",
 			"row" => 1,

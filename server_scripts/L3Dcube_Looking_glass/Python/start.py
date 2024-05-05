@@ -92,9 +92,9 @@ def run_process(code, port):
                 send_serial_commands_process.terminate()
                 send_serial_commands_process.join()
 
-                # arduinoClear = serial.Serial(port, 250000)
-                # arduinoClear.write(b"clearCube\n")
-                # arduinoClear.close()
+                arduinoClear = serial.Serial(port, 250000)
+                arduinoClear.write(b"clearCube\n")
+                arduinoClear.close()
 
             print("Process has been terminated.")
 
@@ -107,8 +107,8 @@ def run_process(code, port):
 
 def generate_arduino_instructions(code, temp_file_path):
     local_scope = {
-        'setPixelColor': setPixelColor,
-        'setMultiplePixelColor': setMultiplePixelColor,
+        'setLed': setLed,
+        'setLeds': setLeds,
         'clearCube': clearCube,
         'cube_size': cube_size,
         'sleep': sleep,
@@ -170,13 +170,13 @@ def wait_for_acknowledgement(arduino):
                 break
 
 
-def setPixelColor(position, color):
+def setLed(position, color):
     index = xyz_to_index(position[0], position[1], position[2])
     command = f"Pixel,{color[0]},{color[1]},{color[2]},{index}"
     print(command)
 
 
-def setMultiplePixelColor(positions, color):
+def setLeds(positions, color):
     indexes = [xyz_to_index(pos[0], pos[1], pos[2]) for pos in positions]
     command = f"Pixels,{color[0]},{color[1]},{color[2]},"
     command += ",".join(map(str, indexes))
