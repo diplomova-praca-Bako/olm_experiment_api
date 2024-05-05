@@ -7,9 +7,9 @@ return [
 			"rules" => "required",
 			"title" => "C code",
 			"placeholder" => "
-for (int x = 0; x < cube_size; x++) {
-	for (int y = 0; y < cube_size; y++) {
-		for (int z = 0; z < cube_size; z++) {
+for (int x = 0; x < 8; x++) {
+	for (int y = 0; y < 8; y++) {
+		for (int z = 0; z < 8; z++) {
 			setLed(x,y,z);
 			sleep(30);
 		}

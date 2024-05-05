@@ -5,31 +5,43 @@ import subprocess
 import os
 import re
 import time
+import tempfile
 
-def compile_and_upload(code, port, board_type="arduino:avr:uno"):
-    # Create a temporary directory to hold the sketch
-    temp_dir = "temp_sketch"
-    os.makedirs(temp_dir, exist_ok=True)
 
-    # Write the Arduino code to a .ino file in the temporary directory
-    sketch_path = os.path.join(temp_dir, "temp_sketch.ino")
-    with open(sketch_path, "w") as file:
-        file.write(code)
+def main():
+    args = getArguments()
+    
+    code_to_run=''
 
-    # Compile and upload using Arduino CLI
-    compile_cmd = f"arduino-cli compile --fqbn {board_type} {temp_dir}"
-    upload_cmd = f"arduino-cli upload -p {port} --fqbn {board_type} {temp_dir}"
+    if args.get("demo_name"):
+        demo_file_path = os.path.join(args['uploaded_file'], args['demo_name'] + '.cpp')
+        try:
+            with open(demo_file_path, 'r') as file:
+                demo_content = file.read()
+            code_to_run=demo_content
 
-    try:
-        subprocess.run(compile_cmd, check=True, shell=True)
-        subprocess.run(upload_cmd, check=True, shell=True)
-        print("Upload successful")
-    except subprocess.CalledProcessError as e:
-        print(f"An error occurred: {e}")
+        except FileNotFoundError:
+            print(f"File '{demo_file_path}' not found.")
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
-    # Clean up: remove the temporary directory
-    subprocess.run(f"rm -rf {temp_dir}", shell=True)
+    elif args.get("uploaded_code_file"):
+        code_to_run=args["uploaded_code_file"]
 
+
+    else:
+        code_to_run=args.get("c_code", "")
+    
+
+    cpp_file_path = create_cpp_file_from_template(code_to_run)
+    arduino_instructions = generate_arduino_instructions(cpp_file_path)
+    
+    full_arduino_code = generate_arduino_code(arduino_instructions)
+    
+    compile_and_upload(full_arduino_code, args["port"])
+
+    time.sleep(30)
+    clear_cube(args["port"])
 
 def getArguments():
     parser = argparse.ArgumentParser()
@@ -38,11 +50,8 @@ def getArguments():
     parser.add_argument("--output")
     args = parser.parse_args()
 
-    print("ARGS getArguments")
-    print(args)
-
     input_str = args.input
-    # keys = ['c_code', 'uploaded_code_file', 'uploaded_file', 'demo_name']
+
     keys = ['c_code', 'uploaded_code_file', 'uploaded_file', 'demo_name']
     result = {}
 
@@ -60,33 +69,6 @@ def getArguments():
 
     return result
 
-def main():
-    args = getArguments()
-    
-    if args.get("demo_name"):
-        demo_file_path = os.path.join(args['uploaded_file'], args['demo_name'] + '.cpp')
-        try:
-            with open(demo_file_path, 'r') as file:
-                demo_content = file.read()
-            full_arduino_code = generate_arduino_code(demo_content)
-            compile_and_upload(full_arduino_code, args["port"])
-        except FileNotFoundError:
-            print(f"File '{demo_file_path}' not found.")
-        except Exception as e:
-            print(f"An error occurred: {e}")
-
-    elif args.get("uploaded_code_file"):
-        full_arduino_code = generate_arduino_code(args["uploaded_code_file"])
-        compile_and_upload(full_arduino_code, args["port"])
-
-
-    else:
-        full_arduino_code = generate_arduino_code(args.get("c_code", ""))
-        compile_and_upload(full_arduino_code, args["port"])
-
-    # time.sleep(30)
-    # clear_cube(args["port"])
-
 def clear_cube(port):
   empty_sketch =  '''
 void setup(){}
@@ -95,6 +77,76 @@ void loop(){}
 '''
   compile_and_upload(empty_sketch, port)
 
+def create_cpp_file_from_template(cpp_code):
+    cpp_template = '''
+#include <iostream>
+#include <vector>
+
+namespace SafeAPI {{
+
+  void setLed(int x, int y, int z) {{
+      std::cout << "setLed(" << x << "," << y << "," << z << ");" << std::endl;
+  }}
+
+  void clearLed(int x, int y, int z) {{
+      std::cout << "clearLed(" << x << "," << y << "," << z << ");" << std::endl;
+  }}
+
+  void clearCube() {{
+      std::cout << "clearCube();" << std::endl;
+  }}
+
+  void sleep(int millis) {{
+      std::cout << "sleep(" << millis << ");" << std::endl;
+  }}
+}}
+
+int main() {{
+    using namespace SafeAPI;
+
+    {cpp_code}
+    return 0;
+}}
+'''
+    # Ensure variable name in format matches the placeholder
+    cpp_content = cpp_template.format(cpp_code=cpp_code)
+
+    # Save to a temporary file
+    temp_cpp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".cpp")
+    with open(temp_cpp_file.name, 'w') as file:
+        file.write(cpp_content)
+    
+    return temp_cpp_file.name
+
+def generate_arduino_instructions(cpp_file_path):
+    executable_path = cpp_file_path.rsplit('.', 1)[0]
+    compile_command = f"g++ -std=c++11 {cpp_file_path} -o {executable_path}"
+    output = ""
+    try:
+        # Compiling the C++ code
+        subprocess.check_call(compile_command, shell=True)
+        print("Compilation successful.")
+
+        # Attempt to run the executable with a timeout
+        process = subprocess.Popen([executable_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            output, errors = process.communicate(timeout=0.5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            output, errors = process.communicate()
+            print(f"Process timed out.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error during compilation or execution: {e}")
+    finally:
+        # Cleanup
+        os.remove(cpp_file_path)
+        if os.path.exists(executable_path):
+            os.remove(executable_path)
+
+    lines = output.splitlines()[:1000]     # Split the output into lines and get only the first 1000 because otherwise compilation takes too long
+
+    output = "\n".join(lines)
+    return output
 
 def generate_arduino_code(c_code_snippet):
     arduino_code_template = '''
@@ -107,8 +159,6 @@ def generate_arduino_code(c_code_snippet):
 
 volatile unsigned char cube[8][8];
 volatile int current_layer = 0;
-
-const int cube_size = 8;
 
 void setup(){{
   int i;
@@ -244,6 +294,29 @@ void sleep(int millis){{
     # Insert the C code snippet into the template
     return arduino_code_template.format(c_code_snippet)
 
+def compile_and_upload(code, port, board_type="arduino:avr:uno"):
+    # Create a temporary directory to hold the sketch
+    temp_dir = "temp_sketch"
+    os.makedirs(temp_dir, exist_ok=True)
+
+    # Write the Arduino code to a .ino file in the temporary directory
+    sketch_path = os.path.join(temp_dir, "temp_sketch.ino")
+    with open(sketch_path, "w") as file:
+        file.write(code)
+
+    # Compile and upload using Arduino CLI
+    compile_cmd = f"arduino-cli compile --fqbn {board_type} {temp_dir}"
+    upload_cmd = f"arduino-cli upload -p {port} --fqbn {board_type} {temp_dir}"
+
+    try:
+        subprocess.run(compile_cmd, check=True, shell=True)
+        subprocess.run(upload_cmd, check=True, shell=True)
+        print("Upload successful")
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred: {e}")
+
+    # Clean up: remove the temporary directory
+    subprocess.run(f"rm -rf {temp_dir}", shell=True)
 
 if __name__ == '__main__':
     main()

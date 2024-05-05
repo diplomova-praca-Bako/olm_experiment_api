@@ -11,7 +11,6 @@ import re
 import sys
 import tempfile
 
-cube_size = 8
 
 def main():
     args=getArguments()
@@ -56,12 +55,10 @@ def getArguments():
     result['output'] = args.output
     return result
 
-
 def process_wrapper(shared_dict, code, temp_file_path):
     output = generate_arduino_instructions(code, temp_file_path)
     shared_dict['output'] = output
     
-
 def run_process(code, port):
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
         temp_file_path = temp_file.name
@@ -81,16 +78,16 @@ def run_process(code, port):
     try:
         with open(temp_file_path, 'r') as file:
             output = file.read()
-            commands = output.split('\n')
+            instructions = output.split('\n')
     
-            send_serial_commands_process = Process(target=send_serial_commands, args=(port, commands))
-            send_serial_commands_process.start()
+            send_serial_instructions_process = Process(target=send_serial_instructions, args=(port, instructions))
+            send_serial_instructions_process.start()
 
-            send_serial_commands_process.join(timeout=30)
-            if send_serial_commands_process.is_alive():
+            send_serial_instructions_process.join(timeout=30)
+            if send_serial_instructions_process.is_alive():
                 print("Timeout reached. Terminating process now...")
-                send_serial_commands_process.terminate()
-                send_serial_commands_process.join()
+                send_serial_instructions_process.terminate()
+                send_serial_instructions_process.join()
 
                 arduinoClear = serial.Serial(port, 250000)
                 arduinoClear.write(b"clearCube\n")
@@ -104,13 +101,12 @@ def run_process(code, port):
         os.remove(temp_file_path)
         print("Process has been terminated.")
 
-
 def generate_arduino_instructions(code, temp_file_path):
     local_scope = {
         'setLed': setLed,
+        'clearLed': clearLed,
         'setLeds': setLeds,
         'clearCube': clearCube,
-        'cube_size': cube_size,
         'sleep': sleep,
         'math': math,
         'random': random
@@ -127,9 +123,8 @@ def generate_arduino_instructions(code, temp_file_path):
             raise(e)
 
         sys.stdout = old_stdout
-    
 
-def send_serial_commands(port, commands):
+def send_serial_instructions(port, instructions):
 
     # arduino_init_start = time.time()
 
@@ -143,23 +138,22 @@ def send_serial_commands(port, commands):
     #time.sleep(2)
 
 
-    for command in commands:
-        # command_start_time = time.time()
+    for instruction in instructions:
+        # instruction_start_time = time.time()
 
-        # print(f"Sending command to Arduino: {command}")
+        # print(f"Sending instruction to Arduino: {instruction}")
         
-        arduino.write((command + '\n').encode())
+        arduino.write((instruction + '\n').encode())
         
         wait_for_acknowledgement(arduino)
-        # command_end_time = time.time()
-        # command_duration = command_end_time - command_start_time
-        # print(f"Command executed in {command_duration} seconds")
+        # instruction_end_time = time.time()
+        # instruction_duration = instruction_end_time - instruction_start_time
+        # print(f"instruction executed in {instruction_duration} seconds")
 
     arduino.write(b"clearCube\n")
 
     if arduino:
         arduino.close()
-
 
 def wait_for_acknowledgement(arduino):
     while True:
@@ -169,31 +163,30 @@ def wait_for_acknowledgement(arduino):
                 # print("ACK received")
                 break
 
-
 def setLed(position, color):
     index = xyz_to_index(position[0], position[1], position[2])
-    command = f"Pixel,{color[0]},{color[1]},{color[2]},{index}"
-    print(command)
+    instruction = f"Pixel,{color[0]},{color[1]},{color[2]},{index}"
+    print(instruction)
 
+def clearLed(position):
+    index = xyz_to_index(position[0], position[1], position[2])
+    instruction = f"ClPixel,{index}"
+    print(instruction)
 
 def setLeds(positions, color):
     indexes = [xyz_to_index(pos[0], pos[1], pos[2]) for pos in positions]
-    command = f"Pixels,{color[0]},{color[1]},{color[2]},"
-    command += ",".join(map(str, indexes))
-    print(command)
-
+    instruction = f"Pixels,{color[0]},{color[1]},{color[2]},"
+    instruction += ",".join(map(str, indexes))
+    print(instruction)
 
 def clearCube():
     print("clearCube\n")
 
-
 def sleep(millis):
     print(f"sleep,{millis}")
 
-
 def xyz_to_index(x, y, z):
-    return z * cube_size * cube_size + x * cube_size + y
-
+    return z * 8 * 8 + x * 8 + y
 
 if __name__ == '__main__':
     main()

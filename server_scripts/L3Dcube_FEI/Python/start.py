@@ -7,16 +7,35 @@ import time
 import math
 import random
 import re
-from io import StringIO
 import sys
+from multiprocessing import Process, Manager
+import tempfile
 
-def wait_for_acknowledgement():
-    global arduino
-    while True:
-        if arduino.in_waiting > 0:
-            line = arduino.readline().decode().strip()
-            if line == "ACK":
-                break
+def main():
+    args=getArguments()
+
+    code_to_run=''
+
+    if args.get("demo_name"):
+        demo_file_path = os.path.join(args['uploaded_file'], args['demo_name'] + '.cpp')
+        try:
+            with open(demo_file_path, 'r') as file:
+                demo_content = file.read()
+            code_to_run=demo_content
+
+        except FileNotFoundError:
+            print(f"File '{demo_file_path}' not found.")
+        except Exception as e:
+            print(f"An error occurred: {e}")
+
+    elif args.get("uploaded_code_file"):
+        code_to_run=args["uploaded_code_file"]
+
+
+    else:
+        code_to_run=args.get("python_code", "")
+
+    run_process(code_to_run, args["port"])
 
 def getArguments():
     parser = argparse.ArgumentParser()
@@ -25,11 +44,8 @@ def getArguments():
     parser.add_argument("--output")
     args = parser.parse_args()
 
-    print("ARGS getArguments")
-    print(args)
-
     input_str = args.input
-    # keys = ['c_code', 'uploaded_code_file', 'uploaded_file', 'demo_name']
+
     keys = ['python_code', 'uploaded_code_file', 'uploaded_file', 'demo_name']
     result = {}
 
@@ -47,29 +63,6 @@ def getArguments():
 
     return result
 
-def main():
-    args=getArguments()
-
-    if(args["demo_name"] and args["demo_name"] != ""):
-        demo_file_path = os.path.join(args['uploaded_file'], args['demo_name'] + '.py')
-        demo_content: any
-        try:
-            with open(demo_file_path, 'r') as file:
-                demo_content = file.read()
-        except FileNotFoundError:
-            print(f"File '{demo_file_path}' not found.")
-        except Exception as e:
-            print(f"An error occurred: {e}")
-        run_process(demo_content, args["port"])
-
-    elif(args["uploaded_code_file"] and args["uploaded_code_file"] != ""):
-        run_process(args["uploaded_code_file"], args["port"])
-    else:
-        run_process(args["python_code"], args["port"])
-
-    # time.sleep(30)
-    # clear_cube(args["port"])
-
 def clear_cube(port):
   empty_sketch =  '''
 void setup(){}
@@ -78,16 +71,68 @@ void loop(){}
 '''
   compile_and_upload(empty_sketch, port)
 
+def process_wrapper(shared_dict, code, temp_file_path):
+    output = generate_arduino_instructions(code, temp_file_path)
+    shared_dict['output'] = output
 
 def run_process(code, port):
-    dynamic_code=create_text_from_dynamic_code(code)
-    print(dynamic_code)
-    full_arduino_code=generate_arduino_code(dynamic_code)
-    print(full_arduino_code)
-    compile_and_upload(full_arduino_code,port)
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+      temp_file_path = temp_file.name
+
+    with Manager() as manager:
+        shared_dict = manager.dict()
+
+        code_process = Process(target=process_wrapper, args=(shared_dict, code, temp_file_path))
+        code_process.start()
+        code_process.join(timeout=0.5)
+
+        if code_process.is_alive():
+            print("Timeout reached. Terminating process now...")
+            code_process.terminate()
+            code_process.join()
+
+    try:
+        with open(temp_file_path, 'r') as file:
+            output = file.read()
+            lines = output.splitlines()[:1000]     # Split the output into lines and get only the first 1000 because otherwise compilation takes too long
+
+            arduino_instructions = "\n".join(lines)
+
+            full_arduino_code=generate_arduino_code(arduino_instructions)
+
+            compile_and_upload(full_arduino_code,port)
+            time.sleep(30)
+            clear_cube(port)
 
 
+    except IOError:
+        print("Failed to read output from the temporary file.")
 
+        os.remove(temp_file_path)
+        print("Process has been terminated.")
+
+def generate_arduino_instructions(code, temp_file_path):
+    local_scope = {
+        'setLed': setLed,
+        'clearLed': clearLed,
+        # 'setLeds': setLeds,
+        'clearCube': clearCube,
+        'sleep': sleep,
+        'math': math,
+        'random': random
+    }
+
+    with open(temp_file_path, "w") as temp_file:
+        old_stdout = sys.stdout
+        sys.stdout = temp_file
+
+        try:
+            exec(code, local_scope)
+        except Exception as e:
+            print(f"Error executing dynamic code: {e}")
+            raise(e)
+
+        sys.stdout = old_stdout
 
 def setLed(x, y, z):
     print(f"setLed({x}, {y}, {z});")
@@ -101,70 +146,6 @@ def sleep(millis):
 def clearCube():
     print(f"clearCube();")
 
-
-def create_text_from_dynamic_code(dynamic_code): # obmedzit cas behu na par sekund
-    local_scope = {
-        'setLed': setLed,
-        'clearLed': clearLed,
-        'clearCube': clearCube,
-        'sleep': sleep,
-        'math': math,
-        'random': random
-    }
-
-    # Redirect standard output to a StringIO object
-    old_stdout = sys.stdout
-    sys.stdout = StringIO()
-
-    # Execute the dynamic code
-    try:
-        exec(dynamic_code, local_scope)
-    except Exception as e:
-      print(f"Error executing dynamic code: {e}")
-      raise(e)
-
-
-
-    # Retrieve the output from the StringIO object
-    dynamic_text = sys.stdout.getvalue()
-
-    # Restore the original standard output
-    sys.stdout = old_stdout
-
-    # Return the captured output
-    return dynamic_text
-
-
-def compile_and_upload(code, port, board_type="arduino:avr:uno"):
-    # Create a temporary directory to hold the sketch
-    temp_dir = "temp_sketch"
-    os.makedirs(temp_dir, exist_ok=True)
-
-    # Write the Arduino code to a .ino file in the temporary directory
-    sketch_path = os.path.join(temp_dir, "temp_sketch.ino")
-    with open(sketch_path, "w") as file:
-        file.write(code)
-
-    # Compile and upload using Arduino CLI
-    compile_cmd = f"arduino-cli compile --fqbn {board_type} {temp_dir}"
-    upload_cmd = f"arduino-cli upload -p {port} --fqbn {board_type} {temp_dir}"
-
-    try:
-        subprocess.run(compile_cmd, check=True, shell=True)
-        subprocess.run(upload_cmd, check=True, shell=True)
-        print("Upload successful")
-    except subprocess.CalledProcessError as e:
-        print(f"An error occurred: {e}")
-
-    # Clean up: remove the temporary directory
-    subprocess.run(f"rm -rf {temp_dir}", shell=True)
-
-
-
-
-
-
-
 def generate_arduino_code(c_code_snippet):
     arduino_code_template = '''
 #include <avr/interrupt.h>
@@ -176,8 +157,6 @@ def generate_arduino_code(c_code_snippet):
 
 volatile unsigned char cube[8][8];
 volatile int current_layer = 0;
-
-const int cube_size = 8;
 
 void setup(){{
   int i;
@@ -312,8 +291,29 @@ void sleep(int millis){{
 '''
     return arduino_code_template.format(c_code_snippet)
 
+def compile_and_upload(code, port, board_type="arduino:avr:uno"):
+    # Create a temporary directory to hold the sketch
+    temp_dir = "temp_sketch"
+    os.makedirs(temp_dir, exist_ok=True)
 
+    # Write the Arduino code to a .ino file in the temporary directory
+    sketch_path = os.path.join(temp_dir, "temp_sketch.ino")
+    with open(sketch_path, "w") as file:
+        file.write(code)
 
+    # Compile and upload using Arduino CLI
+    compile_cmd = f"arduino-cli compile --fqbn {board_type} {temp_dir}"
+    upload_cmd = f"arduino-cli upload -p {port} --fqbn {board_type} {temp_dir}"
+
+    try:
+        subprocess.run(compile_cmd, check=True, shell=True)
+        subprocess.run(upload_cmd, check=True, shell=True)
+        print("Upload successful")
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred: {e}")
+
+    # Clean up: remove the temporary directory
+    subprocess.run(f"rm -rf {temp_dir}", shell=True)
 
 if __name__ == '__main__':
     main()

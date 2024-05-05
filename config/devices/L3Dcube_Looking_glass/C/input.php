@@ -8,24 +8,23 @@ return [
 			"title" => "C code",
 			"placeholder" => "
 while (true) {
-	setPixelColor({0,0,0}, {255, 0, 0});
-	setPixelColor({0,0,1}, {255, 0, 0});
-	setPixelColor({0,0,2}, {255, 0, 0});
-	setPixelColor({0,0,3}, {255, 0, 0});
-	setPixelColor({0,0,4}, {255, 0, 0});
-	setPixelColor({0,0,5}, {255, 0, 0});
-	setPixelColor({0,0,6}, {255, 0, 0});
-	setPixelColor({0,0,7}, {255, 0, 0});
+	setLed({0,0,0}, {255, 0, 0});
+	setLed({0,0,1}, {255, 0, 0});
+	setLed({0,0,2}, {255, 0, 0});
+	setLed({0,0,3}, {255, 0, 0});
+	setLed({0,0,4}, {255, 0, 0});
+	setLed({0,0,5}, {255, 0, 0});
+	setLed({0,0,6}, {255, 0, 0});
+	setLed({0,0,7}, {255, 0, 0});
 	sleep(500);
-	setPixelColor({0,0,0}, {0, 0, 0});
-	setPixelColor({0,0,1}, {0, 0, 0});
-	setPixelColor({0,0,2}, {0, 0, 0});
-	setPixelColor({0,0,3}, {0, 0, 0});
-	setPixelColor({0,0,4}, {0, 0, 0});
-	setPixelColor({0,0,5}, {0, 0, 0});
-	setPixelColor({0,0,6}, {0, 0, 0});
-	setPixelColor({0,0,7}, {0, 0, 0});
-	sleep(500);
+	clearLed({0,0,0});
+	clearLed({0,0,1});
+	clearLed({0,0,2});
+	clearLed({0,0,3});
+	clearLed({0,0,4});
+	clearLed({0,0,5});
+	clearLed({0,0,6});
+	clearLed({0,0,7});
 }",
 			"type" => "textarea",
 			"row" => 1,

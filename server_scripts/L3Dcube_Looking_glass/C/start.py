@@ -9,24 +9,24 @@ import tempfile
 import re
 from multiprocessing import Process
 
+def main():
+  args = getArguments()
+  if(args["demo_name"] and args["demo_name"] != ""):
+    demo_file_path = os.path.join(args['uploaded_file'], args['demo_name'] + '.c')
+    demo_content: any
+    try:
+        with open(demo_file_path, 'r') as file:
+            demo_content = file.read()
+    except FileNotFoundError:
+        print(f"File '{demo_file_path}' not found.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    run_instructions(demo_content, args["port"])
 
-def time_it(func):
-    def wrapper(*args, **kwargs):
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        print(f"{func.__name__} executed in {end_time - start_time} seconds")
-        return result
-    return wrapper
-
-def wait_for_acknowledgement(arduino):
-    while True:
-        if arduino.in_waiting > 0:
-            line = arduino.readline().decode().strip()
-            if line == "ACK":
-                print("ACK received")
-                break
-
+  elif(args["uploaded_code_file"] and args["uploaded_code_file"] != ""):
+    run_instructions(args["uploaded_code_file"], args["port"])
+  else:
+    run_instructions(args["c_code"], args["port"])
 
 def getArguments():
     parser = argparse.ArgumentParser()
@@ -56,7 +56,6 @@ def getArguments():
 
     return result
 
-
 def create_cpp_file_from_template(cpp_code):
     cpp_template = """
 #include<iostream>
@@ -64,15 +63,13 @@ def create_cpp_file_from_template(cpp_code):
 #include<thread>
 #include<vector>
 
-const int cube_size = 8;
-
 using namespace std;
 
 
 namespace SafeAPI {{
 
     int xyzToIndex(int x, int y, int z) {{
-        return z * cube_size * cube_size + x * cube_size + y;
+        return z * 8 * 8 + x * 8 + y;
     }}
 
     void setLed(std::vector<int> position, std::vector<int> color) {{
@@ -83,6 +80,13 @@ namespace SafeAPI {{
         int b = color[2];
 
         cout << "Pixel," << r << "," << g << "," << b << "," << index << endl;
+    }}
+
+    void clearLed(std::vector<int> position) {{
+
+        int index = xyzToIndex(position[0], position[1], position[2]);
+
+        cout << "ClPixel," << index << endl;
     }}
 
     void setLeds(std::vector<std::vector<int>> positions, std::vector<int> color) {{
@@ -131,47 +135,25 @@ int main() {{
     
     return temp_cpp_file.name
 
-
-def main():
-  args = getArguments()
-  if(args["demo_name"] and args["demo_name"] != ""):
-    demo_file_path = os.path.join(args['uploaded_file'], args['demo_name'] + '.c')
-    demo_content: any
-    try:
-        with open(demo_file_path, 'r') as file:
-            demo_content = file.read()
-    except FileNotFoundError:
-        print(f"File '{demo_file_path}' not found.")
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    run_instructions(demo_content, args["port"])
-
-  elif(args["uploaded_code_file"] and args["uploaded_code_file"] != ""):
-    run_instructions(args["uploaded_code_file"], args["port"])
-  else:
-    run_instructions(args["c_code"], args["port"])
-
-
 def run_instructions(code, port):
   cpp_file_path = create_cpp_file_from_template(code)
-  command_outputs = compile_and_run_cpp(cpp_file_path)
-  if command_outputs:
+  arduino_instructions = generate_arduino_instructions(cpp_file_path)
 
-    commands = command_outputs.split('\n')
-    send_serial_commands_process = Process(target=send_serial_commands, args=(port, commands))
-    send_serial_commands_process.start()
+  if arduino_instructions:
+    instructions = arduino_instructions.split('\n')
+    send_serial_instructions_process = Process(target=send_serial_instructions, args=(port, instructions))
+    send_serial_instructions_process.start()
 
-    send_serial_commands_process.join(timeout=30)
-    if send_serial_commands_process.is_alive():
+    send_serial_instructions_process.join(timeout=30)
+    if send_serial_instructions_process.is_alive():
         print("Timeout reached. Terminating process now...")
-        send_serial_commands_process.terminate()
-        send_serial_commands_process.join()
+        send_serial_instructions_process.terminate()
+        send_serial_instructions_process.join()
         arduinoClear = serial.Serial(port, 250000)
         arduinoClear.write(b"clearCube\n")
         arduinoClear.close()
 
-# Function to compile and run C++ code, with timeout handling
-def compile_and_run_cpp(cpp_file_path):
+def generate_arduino_instructions(cpp_file_path):
     executable_path = cpp_file_path.rsplit('.', 1)[0]
     compile_command = f"g++ -std=c++11 {cpp_file_path} -o {executable_path}"
     output = ""
@@ -199,15 +181,13 @@ def compile_and_run_cpp(cpp_file_path):
             os.remove(executable_path)
     return output
 
-
-
-def send_serial_commands(port, commands):
+def send_serial_instructions(port, instructions):
     arduino = serial.Serial(port, 250000)
     wait_for_acknowledgement(arduino)  #this instead of time.sleep(2)
 
 
-    for command in commands:
-        arduino.write((command + '\n').encode())
+    for instruction in instructions:
+        arduino.write((instruction + '\n').encode())
         
         wait_for_acknowledgement(arduino)
 
@@ -216,7 +196,22 @@ def send_serial_commands(port, commands):
     if arduino:
         arduino.close()
 
+def wait_for_acknowledgement(arduino):
+    while True:
+        if arduino.in_waiting > 0:
+            line = arduino.readline().decode().strip()
+            if line == "ACK":
+                print("ACK received")
+                break
 
+def time_it(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        print(f"{func.__name__} executed in {end_time - start_time} seconds")
+        return result
+    return wrapper
 
 if __name__ == '__main__':
     main()
