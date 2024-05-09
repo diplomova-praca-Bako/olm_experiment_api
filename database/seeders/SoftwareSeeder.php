@@ -13,7 +13,7 @@ class SoftwareSeeder extends Seeder
         'openloop',
         'openmodelica',
         'scilab',
-        'C',
+        'Cpp',
         'Python'
     ];
 

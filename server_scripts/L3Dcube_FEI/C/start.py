@@ -30,12 +30,12 @@ def main():
 
 
     else:
-        code_to_run=args.get("c_code", "")
+        code_to_run=args.get("cpp_code", "")
     
 
     cpp_file_path = create_cpp_file_from_template(code_to_run)
     arduino_instructions = generate_arduino_instructions(cpp_file_path)
-    
+
     full_arduino_code = generate_arduino_code(arduino_instructions)
     
     compile_and_upload(full_arduino_code, args["port"])
@@ -52,7 +52,7 @@ def getArguments():
 
     input_str = args.input
 
-    keys = ['c_code', 'uploaded_code_file', 'uploaded_file', 'demo_name']
+    keys = ['cpp_code', 'uploaded_code_file', 'uploaded_file', 'demo_name']
     result = {}
 
     pattern = re.compile(r'(' + '|'.join(keys) + r'):(.*?)(?=(?:, ' + '|'.join(keys) + r':)|$)', re.DOTALL)
@@ -148,7 +148,7 @@ def generate_arduino_instructions(cpp_file_path):
     output = "\n".join(lines)
     return output
 
-def generate_arduino_code(c_code_snippet):
+def generate_arduino_code(cpp_code_snippet):
     arduino_code_template = '''
 #include <avr/interrupt.h>
 #include <string.h>
@@ -291,8 +291,8 @@ void sleep(int millis){{
 '''
 
     
-    # Insert the C code snippet into the template
-    return arduino_code_template.format(c_code_snippet)
+    # Insert the C++ code snippet into the template
+    return arduino_code_template.format(cpp_code_snippet)
 
 def compile_and_upload(code, port, board_type="arduino:avr:uno"):
     # Create a temporary directory to hold the sketch

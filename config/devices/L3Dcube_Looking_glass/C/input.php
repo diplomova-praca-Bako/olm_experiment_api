@@ -3,9 +3,9 @@
 return [
 	"start" => [
 		[
-			"name" => "c_code",
+			"name" => "cpp_code",
 			"rules" => "required",
-			"title" => "C code",
+			"title" => "C++ code",
 			"placeholder" => "
 while (true) {
 	setLed({0,0,0}, {255, 0, 0});

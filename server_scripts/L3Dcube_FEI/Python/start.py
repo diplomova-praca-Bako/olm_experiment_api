@@ -146,7 +146,7 @@ def sleep(millis):
 def clearCube():
     print(f"clearCube();")
 
-def generate_arduino_code(c_code_snippet):
+def generate_arduino_code(cpp_code_snippet):
     arduino_code_template = '''
 #include <avr/interrupt.h>
 #include <string.h>
@@ -289,7 +289,7 @@ void sleep(int millis){{
   delay(millis);
 }}
 '''
-    return arduino_code_template.format(c_code_snippet)
+    return arduino_code_template.format(cpp_code_snippet)
 
 def compile_and_upload(code, port, board_type="arduino:avr:uno"):
     # Create a temporary directory to hold the sketch

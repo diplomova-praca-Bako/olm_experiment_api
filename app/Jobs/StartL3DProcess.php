@@ -16,7 +16,7 @@ use App\Helpers\Helpers;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
 
-class StartL3DProcess implements ShouldQueue
+class StartLEDProcess implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -92,7 +92,7 @@ class StartL3DProcess implements ShouldQueue
     {
         $errorMessage = '';
     
-        if ($this->software === "C") {
+        if ($this->software === "Cpp") {
             preg_match("/error: '.*?' was not declared in this scope/", $errorOutput, $matches);
             $errorMessage = $matches[0] ?? ltrim(preg_replace('/\s*\/[^:]+:\d+:\d+:\s*/', '; ', $errorOutput), "; ");
         } 

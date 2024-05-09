@@ -26,7 +26,7 @@ def main():
   elif(args["uploaded_code_file"] and args["uploaded_code_file"] != ""):
     run_instructions(args["uploaded_code_file"], args["port"])
   else:
-    run_instructions(args["c_code"], args["port"])
+    run_instructions(args["cpp_code"], args["port"])
 
 def getArguments():
     parser = argparse.ArgumentParser()
@@ -39,7 +39,7 @@ def getArguments():
     print(args)
 
     input_str = args.input
-    keys = ['c_code', 'uploaded_code_file', 'uploaded_file', 'demo_name']
+    keys = ['cpp_code', 'uploaded_code_file', 'uploaded_file', 'demo_name']
     result = {}
 
     pattern = re.compile(r'(' + '|'.join(keys) + r'):(.*?)(?=(?:, ' + '|'.join(keys) + r':)|$)', re.DOTALL)

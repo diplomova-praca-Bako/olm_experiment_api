@@ -3,7 +3,7 @@
 namespace App\GraphQL\Mutations;
 
 use App\Events\DataBroadcaster;
-use App\Jobs\StartL3DProcess;
+use App\Jobs\StartLEDProcess;
 use App\Models\Device;
 use App\Models\ExperimentLog;
 use App\Jobs\StartReadingProcess;
@@ -45,7 +45,7 @@ class RunScript
 
         $demoFileName = explode(".", $args['runScriptInput']['demoName']);
         
-        if (strpos($deviceName, "L3Dcube") !== false) {
+        if (strpos($deviceName, "LED") !== false) {
             $args['runScriptInput']['inputParameter'] = $args['runScriptInput']['inputParameter'] . ",uploaded_file:". storage_path('tmp/uploads/') . ",demo_name:". $demoFileName[0];
         } else {
             $args['runScriptInput']['inputParameter'] = $args['runScriptInput']['inputParameter'] . ",uploaded_file:". storage_path('tmp/uploads/') . ",file_name:". $schemaFileName[0];
@@ -66,9 +66,9 @@ class RunScript
         $uniqueId = uniqid();
         $errorResult = null;
 
-        if (strpos($deviceName, "L3Dcube") !== false) {
-            $L3DProcess = new StartL3DProcess($date, $fileName, $path, $device, $args, $experiment, $deviceName, $software, $uniqueId);
-            dispatch($L3DProcess)->onQueue("Reading");
+        if (strpos($deviceName, "LED") !== false) {
+            $LEDProcess = new StartLEDProcess($date, $fileName, $path, $device, $args, $experiment, $deviceName, $software, $uniqueId);
+            dispatch($LEDProcess)->onQueue("Reading");
             
             sleep(4); //wait for experiment to finish compiling code or generating instructions to see possible errors
 
