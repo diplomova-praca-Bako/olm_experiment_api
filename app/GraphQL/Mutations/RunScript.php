@@ -43,12 +43,28 @@ class RunScript
             $schemaFileName = explode(".", $args['runScriptInput']['fileName']);
         }
 
-        $demoFileName = explode(".", $args['runScriptInput']['demoName']);
+        if (isset($args['runScriptInput']['demoName'])) {
+            $demoFileName = explode(".", $args['runScriptInput']['demoName']);
+        } else {
+            $demoFileName = null;
+        }        
         
         if (strpos($deviceName, "LED") !== false) {
-            $args['runScriptInput']['inputParameter'] = $args['runScriptInput']['inputParameter'] . ",uploaded_file:". storage_path('tmp/uploads/') . ",demo_name:". $demoFileName[0];
+            // Ensure $demoFileName is an array and has at least one element
+            if (is_array($demoFileName) && count($demoFileName) > 0) {
+                $args['runScriptInput']['inputParameter'] .= ",uploaded_file:" . storage_path('tmp/uploads/') . ",demo_name:" . $demoFileName[0];
+            } else {
+                // Handle the case when $demoFileName is null or empty
+                $args['runScriptInput']['inputParameter'] .= ",uploaded_file:" . storage_path('tmp/uploads/') . ",demo_name:";
+            }
         } else {
-            $args['runScriptInput']['inputParameter'] = $args['runScriptInput']['inputParameter'] . ",uploaded_file:". storage_path('tmp/uploads/') . ",file_name:". $schemaFileName[0];
+            // Similar handling should be applied to $schemaFileName
+            if (isset($schemaFileName) && is_array($schemaFileName) && count($schemaFileName) > 0) {
+                $args['runScriptInput']['inputParameter'] .= ",uploaded_file:" . storage_path('tmp/uploads/') . ",file_name:" . $schemaFileName[0];
+            } else {
+                // Handle the case when $schemaFileName is null or empty
+                $args['runScriptInput']['inputParameter'] .= ",uploaded_file:" . storage_path('tmp/uploads/') . ",file_name:";
+            }
         }
 
         Log::channel('server')->error("ERRORMESSAGE: " . $args['runScriptInput']['inputParameter']);
