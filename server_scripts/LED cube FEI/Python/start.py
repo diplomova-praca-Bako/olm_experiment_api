@@ -134,11 +134,11 @@ def generate_arduino_instructions(code, temp_file_path):
 
         sys.stdout = old_stdout
 
-def setLed(x, y, z):
-    print(f"setLed({x}, {y}, {z});")
+def setLed(position):
+    print(f"setLed({position[0]}, {position[1]}, {position[2]});")
 
-def clearLed(x, y, z):
-    print(f"clearLed({x}, {y}, {z});")
+def clearLed(position):
+    print(f"clearLed({position[0]}, {position[1]}, {position[2]});")
 
 def sleep(millis):
     print(f"sleep({millis});")

@@ -84,20 +84,26 @@ def create_cpp_file_from_template(cpp_code):
 
 namespace SafeAPI {{
 
-  void setLed(int x, int y, int z) {{
-      std::cout << "setLed(" << x << "," << y << "," << z << ");" << std::endl;
+  void setLed(std::vector<int> position) {{
+    int x = position[0];
+    int y = position[1];
+    int z = position[2];
+    std::cout << "setLed(" << x << "," << y << "," << z << ");" << std::endl;
   }}
 
-  void clearLed(int x, int y, int z) {{
-      std::cout << "clearLed(" << x << "," << y << "," << z << ");" << std::endl;
+  void clearLed(std::vector<int> position) {{
+    int x = position[0];
+    int y = position[1];
+    int z = position[2];
+    std::cout << "clearLed(" << x << "," << y << "," << z << ");" << std::endl;
   }}
 
   void clearCube() {{
-      std::cout << "clearCube();" << std::endl;
+    std::cout << "clearCube();" << std::endl;
   }}
 
   void sleep(int millis) {{
-      std::cout << "sleep(" << millis << ");" << std::endl;
+    std::cout << "sleep(" << millis << ");" << std::endl;
   }}
 }}
 

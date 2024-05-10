@@ -7,13 +7,25 @@ return [
 			"rules" => "required",
 			"title" => "C++ code",
 			"placeholder" => "
-for (int x = 0; x < 8; x++) {
-	for (int y = 0; y < 8; y++) {
-		for (int z = 0; z < 8; z++) {
-			setLed(x,y,z);
-			sleep(30);
-		}
-	}
+while (true) {
+	setLed({0,0,0});
+	setLed({0,0,1});
+	setLed({0,0,2});
+	setLed({0,0,3});
+	setLed({0,0,4});
+	setLed({0,0,5});
+	setLed({0,0,6});
+	setLed({0,0,7});
+	sleep(500);
+	clearLed({0,0,0});
+	clearLed({0,0,1});
+	clearLed({0,0,2});
+	clearLed({0,0,3});
+	clearLed({0,0,4});
+	clearLed({0,0,5});
+	clearLed({0,0,6});
+	clearLed({0,0,7});
+	sleep(500);
 }",
 			"type" => "textarea",
 			"row" => 1,
