@@ -6,26 +6,7 @@ return [
 			"name" => "python_code",
 			"rules" => "required",
 			"title" => "Python code",
-			"placeholder" => "
-while True:
-	setLed([0,0,7])
-	setLed([0,0,6])
-	setLed([0,0,5])
-	setLed([0,0,4])
-	setLed([0,0,3])
-	setLed([0,0,2])
-	setLed([0,0,1])
-	setLed([0,0,0])
-	sleep(500)
-	clearLed([0,0,7])
-	clearLed([0,0,6])
-	clearLed([0,0,5])
-	clearLed([0,0,4])
-	clearLed([0,0,3])
-	clearLed([0,0,2])
-	clearLed([0,0,1])
-	clearLed([0,0,0])
-	sleep(500)",
+			"placeholder" => "",
 			"type" => "textarea",
 			"row" => 1,
 			"order" => 1,
